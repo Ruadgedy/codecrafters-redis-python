@@ -14,8 +14,6 @@ def main():
         msg = conn.recv(1024).decode()
         if msg == "PING":
             conn.sendall(b"+PONG\r\n")
-        else:
-            conn.sendall(msg.encode())
 
 if __name__ == "__main__":
     main()
