@@ -11,14 +11,14 @@ def main():
     print(f"Connected to server! Address:{addr}")
 
     while True:
-        msg = conn.recv(1024).decode()
-        # print(msg)
-        # 客户端读取的输入不只是“PING”，而是“*1\r\n$4\r\nPING\r\n“，要考虑处理RESP
-        msg = msg.split("\n")
-        for s in msg:
-            print(str(s))
-            if s == "PING":
+        b = conn.recv(2048)
+        st = b.decode().strip().split("\n")
+        for s in st:
+            print(s)
+            if str(s) == "PING":
+                print("sending pong")
                 conn.sendall(b"+PONG\r\n")
+        conn.sendall(b"+Chat End\r\n")
     conn.close()
 
 if __name__ == "__main__":
