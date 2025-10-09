@@ -15,10 +15,10 @@ def main():
         st = b.decode().strip().split("\n")
         for s in st:
             print(s)
-            if str(s) == "PING":
+            if s == "PING":
                 print("sending pong")
                 conn.sendall(b"+PONG\r\n")
-        conn.sendall(b"+Chat End\r\n")
+        # conn.sendall(b"+Chat End\r\n")
     conn.close()
 
 if __name__ == "__main__":
