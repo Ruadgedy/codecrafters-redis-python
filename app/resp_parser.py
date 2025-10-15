@@ -4,7 +4,7 @@ import socket
 def parse_resp(data: str):
 
     if isinstance(data, str):
-        data.encode('utf-8')
+        data = data.encode('utf-8')
 
     # 使用生成器追踪解析位置
     class Parser:
@@ -28,9 +28,9 @@ def parse_resp(data: str):
                 return None
 
             # 查看第一个字符确定类型
-            type_char = self.data[self.pos]
+            type_char = self.data[self.pos:self.pos+1].decode('utf-8')
             self.pos += 1
-            if type_char == b'*':   # Arrays
+            if type_char == '*':   # Arrays
                 array_len = int(self.read_line())
                 if array_len == -1: # Empty array
                     return None
@@ -38,15 +38,14 @@ def parse_resp(data: str):
                 for i in range(array_len):
                     array.append(self.parse())
                 return array
-            elif type_char == b'+': # Simple string
+            elif type_char == '+': # Simple string
                 return self.read_line()
-            elif type_char == b':': # Integer
+            elif type_char == ':': # Integer
                 return int(self.read_line())
-            elif type_char == b'$': # Bulk string
+            elif type_char == '$': # Bulk string
                 str_len = int(self.read_line())
-                self.pos += 2
                 return self.read_line()
-            elif type_char == b'-': # Error
+            elif type_char == '-': # Error
                 raise ValueError(self.read_line())
             else:
                 raise ValueError(f"Unknow RESP type: {type_char}")
