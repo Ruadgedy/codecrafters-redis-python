@@ -1,14 +1,23 @@
 import socket  # noqa: F401
 import threading
 
+from app.resp_parser import parse_resp
+
 BUFFER_SIZE = 2048
 
 def handle_command(client: socket.socket):
     while chunk := client.recv(BUFFER_SIZE):
+        # 客户端输入结束
         if chunk == b"":
             break
         print(f"Received client msg: {chunk.decode()}\n")
-        client.send(b"+PONG\r\n")
+
+        parse = parse_resp(chunk.decode('utf-8'))
+        if isinstance(parse, list): # Arrays
+            if len(parse) == 2 and parse[0].lower() == "echo" : # ECHO command
+                client.sendall(parse[1].encode('utf-8'))
+        elif isinstance(parse, str) and parse.lower() == "ping" :
+            client.send(b"+PONG\r\n")
 
 def main():
     server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
