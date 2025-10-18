@@ -1,13 +1,14 @@
 import socket  # noqa: F401
 import threading
-from typing import Dict, Any
+import time
+from typing import Dict, Any, Optional
 
 from app.resp_parser import parse_resp
 
 BUFFER_SIZE = 2048
 
-# 存储键值对
-redis_data: Dict[str, str] = {}
+# 存储键值对 key -> (value, expire), expire=None represent never expire
+redis_data: Dict[str, tuple[str, Optional[float]]] = {}
 
 def to_resp(value: Any) -> bytes:
     """将python数据类型转化为RESP格式字节串"""
@@ -76,6 +77,12 @@ def parse_resp(data: bytes) -> Any:
     raise ValueError(f"Unsupported RESP format: {type_char} ")
 
 
+def is_expire(expire: Optional[float]) -> bool:
+    if expire is None:
+        return False
+    return time.time() > expire
+
+
 def handle_command(client: socket.socket):
     # 客户端处理请求
     try:
@@ -103,16 +110,53 @@ def handle_command(client: socket.socket):
                     else:
                         response = Exception("ERR wrong number of arguments for 'echo' command")
                 elif cmd == 'SET':
-                    if len(command) >= 3:
-                        redis_data[command[1]] = command[2]
-                        response = "OK"
-                    else:
+                    if len(command) < 3:
                         response = Exception("ERR wrong number of arguments for 'set' command")
-                elif cmd == 'GET':
-                    if len(command) >= 2:
-                        response = redis_data.get(command[1],None)
                     else:
+                        key = command[1]
+                        value = command[2]
+                        expire: Optional[float] = None # 过期时间戳
+
+                        i = 3 # PX or EX if exists
+                        while i < len(command):
+                            param = command[i].upper()  # PX or EX
+                            if param in ('EX', 'PX') and i+1 < len(command):
+                                try:
+                                    ttl = int(command[i + 1])
+                                    if ttl <= 0:
+                                        raise ValueError("invalid expire time in 'set' command")
+                                except ValueError:
+                                    response = Exception("ERR expire time. Is not int")
+                                    break
+
+                                if param == 'EX':
+                                    expire = time.time() + ttl
+                                else:
+                                    expire = time.time() + ttl/1000
+                                i += 2
+                            else:
+                                response = Exception(f"ERR syntax error")
+                                break
+                        else:
+                            redis_data[key] = (value, expire)
+                            response = "OK"
+
+                elif cmd == 'GET':
+                    if len(command) < 2:
                         response = Exception("ERR wrong number of arguments for 'get' command")
+                    else:
+                        key = command[1]
+                        if key in redis_data.keys():
+                            # Inspect key if exists and not expire
+                            value, expire = redis_data[key]
+                            if is_expire(expire):
+                                # delete expired key
+                                del redis_data[key]
+                                response = None
+                            else:
+                                response = value
+                        else:
+                            response = None # key not exists
                 else:
                     response = Exception(f"ERR unknown command '{cmd}'")
 
