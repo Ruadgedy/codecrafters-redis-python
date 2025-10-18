@@ -15,6 +15,9 @@ def to_resp(value: Any) -> bytes:
         # 批量字符串
         value_bytes = value.encode('utf-8')
         return f'${len(value_bytes)}\r\n{value}\r\n'.encode('utf-8')
+    elif value == True:
+        # 简单字符串，用于PING应答
+        return f'+PONG\r\n'.encode('utf-8')
     elif isinstance(value, int):
         # 整数
         return f':{value}\r\n'.encode('utf-8')
@@ -28,9 +31,6 @@ def to_resp(value: Any) -> bytes:
         return f'-{value}\r\n'.encode('utf-8')
     elif value is None:
         return f'_\r\n'.encode('utf-8')
-    elif value == True:
-        # 简单字符串，用于PING应答
-        return f'+PONG\r\n'.encode('utf-8')
     else:
         return to_resp(str(value))
 
