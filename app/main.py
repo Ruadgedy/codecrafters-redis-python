@@ -63,7 +63,7 @@ def parse_resp(data: bytes) -> Any:
             if end == -1:
                 raise ValueError("Invalid RESP format, missing CRLF")
             length = int(data[pos:end])
-            pos += 3
+            pos = end + 2
 
             # 读取字符串
             if pos + length + 2 > len(data):
