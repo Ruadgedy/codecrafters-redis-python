@@ -31,7 +31,7 @@ def to_resp(value: Any) -> bytes:
     elif isinstance(value, Exception):
         return f'-{value}\r\n'.encode('utf-8')
     elif value is None:
-        return f'_\r\n'.encode('utf-8')
+        return f'$-1\r\n'.encode('utf-8')
     else:
         return to_resp(str(value))
 
