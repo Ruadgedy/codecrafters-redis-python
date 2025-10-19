@@ -1,14 +1,23 @@
 import socket  # noqa: F401
 import threading
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from app.resp_parser import parse_resp
 
 BUFFER_SIZE = 2048
 
-# 存储键值对 key -> (value, expire), expire=None represent never expire
-redis_data: Dict[str, tuple[str, Optional[float]]] = {}
+# 存储键值对 {key: ("string", value, expire | ("list", [elements])}
+'''
+tuple[str, Any, Optional[float]]字典的值（value） 必须是一个三元组（tuple），且三元组的三个元素类型固定：
+第一个元素：str
+表示某种 “类型标识”（通常用于区分值的业务类型），例如 "string"、"list" 等。
+第二个元素：Any
+表示具体存储的值，类型不受限制（可以是字符串、列表、数字等任意类型）。
+第三个元素：Optional[float]
+表示过期时间戳，类型可以是 float（浮点数时间戳，如 1620000000.5）或 None（表示永不过期）。
+'''
+redis_data: Dict[str, tuple[str,Any, Optional[float]]] = {}
 
 def to_resp(value: Any) -> bytes:
     """将python数据类型转化为RESP格式字节串"""
@@ -16,7 +25,7 @@ def to_resp(value: Any) -> bytes:
         # 批量字符串
         value_bytes = value.encode('utf-8')
         return f'${len(value_bytes)}\r\n{value}\r\n'.encode('utf-8')
-    elif value == True:
+    elif value is True:
         # 简单字符串，用于PING应答
         return f'+PONG\r\n'.encode('utf-8')
     elif isinstance(value, int):
@@ -138,7 +147,7 @@ def handle_command(client: socket.socket):
                                 response = Exception(f"ERR syntax error")
                                 break
                         else:
-                            redis_data[key] = (value, expire)
+                            redis_data[key] = ("string",value, expire)
                             response = "OK"
 
                 elif cmd == 'GET':
@@ -148,7 +157,9 @@ def handle_command(client: socket.socket):
                         key = command[1]
                         if key in redis_data.keys():
                             # Inspect key if exists and not expire
-                            value, expire = redis_data[key]
+                            type_, value, expire = redis_data[key]
+                            if type_ != "string":
+                                response = None
                             if is_expire(expire):
                                 # delete expired key
                                 del redis_data[key]
@@ -157,6 +168,36 @@ def handle_command(client: socket.socket):
                                 response = value
                         else:
                             response = None # key not exists
+                elif cmd in ("LPUSH", "RPUSH"):
+                    # command format
+                    # RPUSH list_name element1 [element2...]
+                    if len(command) < 3:
+                        response = Exception(f"ERR wrong number of arguments for '{cmd}' command")
+                    else:
+                        key = command[1]
+                        elements = command[2:]
+
+                        # check key if exists
+                        if key in redis_data.keys():
+                            type_, value, expire = redis_data[key]
+                            if type_ != "list":
+                                response = Exception(f"WRONGTYPE Operation against a key holding the wrong kind of value")
+                                client.send(to_resp(response))
+                                continue
+                            lst = value
+                        else:   # key not exists
+                            lst: List[str] = []
+
+                        # Add elements
+                        if cmd == "LPUSH":
+                            lst = elements + lst
+                        else:
+                            lst = lst + elements
+                        redis_data[key] = ("list", lst, None)
+
+                        # return List length
+                        response = len(lst)
+
                 else:
                     response = Exception(f"ERR unknown command '{cmd}'")
 
