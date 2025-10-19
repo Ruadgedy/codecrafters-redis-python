@@ -238,6 +238,19 @@ def handle_command(client: socket.socket):
                                     response = value[start:stop+1]
                         else:
                             response = []
+                elif cmd == "LLEN":
+                    if len(command) != 2:
+                        response = Exception(f"ERR wrong number of arguments for '{cmd}' command")
+                    else:
+                        key = command[1]
+                        if key in redis_data.keys():
+                            type_, value, expire = redis_data[key]
+                            if type_ != "list":
+                                response = None
+                            else:
+                                response = len(value)
+                        else:
+                            response = 0
 
                 else:
                     response = Exception(f"ERR unknown command '{cmd}'")
