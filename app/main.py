@@ -211,13 +211,25 @@ def handle_command(client: socket.socket):
                     else:
                         key = command[1]
                         if key in redis_data.keys():
-                            start = int(command[2])
-                            stop = int(command[3])
+                            try:
+                                start = int(command[2])
+                                stop = int(command[3])
+                            except ValueError:
+                                response = Exception("ERR value is not an integer or out of range")
+                                client.send(to_resp(response))
+                                continue
+
                             type_, value, _= redis_data[key]
                             if type_ != "list":
                                 response = None
                             else:
                                 list_len = len(value)
+
+                                # 处理 start 或 stop存在负数的情况
+                                if start < 0:
+                                    start = max(0, start+list_len)
+                                if stop < 0:
+                                    stop = max(0, stop+list_len)
                                 if start > list_len or start > stop:
                                     response = []
                                 else:
