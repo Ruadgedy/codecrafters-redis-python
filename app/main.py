@@ -197,6 +197,35 @@ def handle_command(client: socket.socket):
 
                         # return List length
                         response = len(lst)
+                elif cmd == "LRANGE":
+                    # command format: LRANGE key start stop
+                    '''
+                    合法性检查：
+                    1、列表不存在，返回空列表
+                    2、如果start大于列表长度，返回空列表
+                    3、如果stop大于等于列表长度，stop指向最后一次元素
+                    4、如果 start>stop，返回空列表
+                    '''
+                    if len(command) != 4:
+                        response = Exception(f"ERR wrong number of arguments for '{cmd}' command")
+                    else:
+                        key = command[1]
+                        if key in redis_data.keys():
+                            start = int(command[2])
+                            stop = int(command[3])
+                            type_, value, _= redis_data[key]
+                            if type_ != "list":
+                                response = None
+                            else:
+                                list_len = len(value)
+                                if start > list_len or start > stop:
+                                    response = []
+                                else:
+                                    if stop >= list_len:
+                                        stop = list_len-1
+                                    response = value[start:stop+1]
+                        else:
+                            response = []
 
                 else:
                     response = Exception(f"ERR unknown command '{cmd}'")
