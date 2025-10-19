@@ -251,6 +251,40 @@ def handle_command(client: socket.socket):
                                 response = len(value)
                         else:
                             response = 0
+                elif cmd == "LPOP":
+                    # LPOP command format: LPOP key [count]
+                    if len(command) not in (2,3):
+                        response = Exception(f"ERR wrong number of arguments for 'lpop' command")
+                    else:
+                        key = command[1]
+                        count = 1
+                        if len(command) == 3:
+                            try:
+                                count = int(command[2])
+                                if count <= 0:
+                                    raise ValueError("count must be positive")
+                            except ValueError:
+                                response = Exception("ERR value is not an integer or out of range")
+                                client.send(to_resp(response))
+                                continue
+
+                        # 检查键是否存在并为列表类型
+                        if key not in redis_data.keys():
+                            response = None
+                        else:
+                            type_, value, expire = redis_data[key]
+                            if type_ != "list":
+                                response = Exception(
+                                    f"WRONGTYPE Operation against a key holding the wrong kind of value")
+                                client.send(to_resp(response))
+                                continue
+                            if not value:  # list is empty
+                                response = None
+                            else:
+                                actual_count = min(count, len(value))
+                                poped = value[:actual_count]
+                                redis_data[key] = ("list", value[actual_count:], expire)
+                                response = poped[0] if actual_count == 1 else poped
 
                 else:
                     response = Exception(f"ERR unknown command '{cmd}'")
