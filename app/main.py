@@ -253,6 +253,7 @@ def handle_command(client: socket.socket):
                             response = 0
                 elif cmd == "LPOP":
                     # LPOP command format: LPOP key [count]
+                    # support multiple items
                     if len(command) not in (2,3):
                         response = Exception(f"ERR wrong number of arguments for 'lpop' command")
                     else:
